@@ -38,7 +38,6 @@
     mode: "0755"
   loop:
     - "/etc/docker"
-    - "/etc/systemd/system/docker.service.d"
 
 - name: Configure Docker daemon options (json)
   template:
@@ -89,45 +88,58 @@
     append: true
   loop: "{{ docker__users }}"
 
-- name: Configure Docker daemon options (flags)
-  template:
-    src: "etc/systemd/system/docker.service.d/options.conf.j2"
-    dest: "/etc/systemd/system/docker.service.d/options.conf"
-    owner: "root"
-    group: "root"
-    mode: "0644"
-  register: docker__register_daemon_flags
-  when: docker__daemon_flags | d()
-  notify: ["Restart Docker"]
+- name: Configure systemd
+  when: ansible_service_mgr == "systemd"
+  block:
+    - name: Create Docker configuration directories
+      file:
+        path: "{{ item }}"
+        state: "directory"
+        owner: "root"
+        group: "root"
+        mode: "0755"
+      loop:
+        - "/etc/systemd/system/docker.service.d"
 
-- name: Configure Docker daemon environment variables
-  template:
-    src: "etc/systemd/system/docker.service.d/environment.conf.j2"
-    dest: "/etc/systemd/system/docker.service.d/environment.conf"
-    owner: "root"
-    group: "root"
-    mode: "0644"
-  register: docker__register_daemon_environment
-  when: docker__daemon_environment | d()
-  notify: ["Restart Docker"]
+    - name: Configure Docker daemon options (flags)
+      template:
+        src: "etc/systemd/system/docker.service.d/options.conf.j2"
+        dest: "/etc/systemd/system/docker.service.d/options.conf"
+        owner: "root"
+        group: "root"
+        mode: "0644"
+      register: docker__register_daemon_flags
+      when: docker__daemon_flags | d()
+      notify: ["Restart Docker"]
 
-- name: Configure custom systemd unit file override
-  template:
-    src: "etc/systemd/system/docker.service.d/custom.conf.j2"
-    dest: "/etc/systemd/system/docker.service.d/custom.conf"
-    owner: "root"
-    group: "root"
-    mode: "0644"
-  register: docker__register_custom_override
-  when: docker__systemd_override | d()
-  notify: ["Restart Docker"]
+    - name: Configure Docker daemon environment variables
+      template:
+        src: "etc/systemd/system/docker.service.d/environment.conf.j2"
+        dest: "/etc/systemd/system/docker.service.d/environment.conf"
+        owner: "root"
+        group: "root"
+        mode: "0644"
+      register: docker__register_daemon_environment
+      when: docker__daemon_environment | d()
+      notify: ["Restart Docker"]
 
-- name: Reload systemd daemon
-  systemd:
-    daemon_reload: true
-  when: docker__register_daemon_flags is changed
-        or docker__register_daemon_environment is changed
-        or docker__register_custom_override is changed
+    - name: Configure custom systemd unit file override
+      template:
+        src: "etc/systemd/system/docker.service.d/custom.conf.j2"
+        dest: "/etc/systemd/system/docker.service.d/custom.conf"
+        owner: "root"
+        group: "root"
+        mode: "0644"
+      register: docker__register_custom_override
+      when: docker__systemd_override | d()
+      notify: ["Restart Docker"]
+
+    - name: Reload systemd daemon
+      systemd:
+        daemon_reload: true
+      when: docker__register_daemon_flags is changed
+            or docker__register_daemon_environment is changed
+            or docker__register_custom_override is changed
 
 - name: Restart Docker now to make sure `docker login` works
   meta: "flush_handlers"
