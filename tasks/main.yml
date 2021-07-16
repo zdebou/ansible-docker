@@ -23,6 +23,7 @@
   apt_key:
     id: "{{ docker__apt_key_id }}"
     url: "{{ docker__apt_key_url }}"
+  environment: "{{ proxy_env | d({}) }}"
 
 - name: Configure Docker's upstream APT repository
   apt_repository:
@@ -61,6 +62,7 @@
     state: "{{ item.state | d('present') }}"
   loop: "{{ docker__default_pip_packages + docker__pip_packages }}"
   when: item.name | d()
+  environment: "{{ proxy_env | d({}) }}"
 
 - name: Create python3-docker proxy script to access the Virtualenv's interpreter
   template:
