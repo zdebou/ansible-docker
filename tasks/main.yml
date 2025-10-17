@@ -43,19 +43,19 @@
     group: "root"
     mode: "0755"
 
-- name: Add Docker's APT repository key
-  ansible.builtin.get_url:
-    url: "{{ docker__apt_repository_url }}/gpg"
-    dest: "/etc/apt/keyrings/docker.asc"
-    checksum: "{{ docker__apt_key_checksum }}"
-    owner: "root"
-    group: "root"
-    mode: "0644"
+# - name: Add Docker's APT repository key
+#   ansible.builtin.get_url:
+#     url: "{{ docker__apt_repository_url }}/gpg"
+#     dest: "/etc/apt/keyrings/docker.asc"
+#     checksum: "{{ docker__apt_key_checksum }}"
+#     owner: "root"
+#     group: "root"
+#     mode: "0644"
 
-- name: Configure Docker's upstream APT repository
-  ansible.builtin.apt_repository:
-    repo: "{{ docker__apt_repository }}"
-    update_cache: true
+# - name: Configure Docker's upstream APT repository
+#   ansible.builtin.apt_repository:
+#     repo: "{{ docker__apt_repository }}"
+#     update_cache: true
 
 - name: Create Docker configuration directories
   ansible.builtin.file:
@@ -96,7 +96,7 @@
     virtualenv_python: "python3"
     state: "{{ item.state | d('present') }}"
   loop: "{{ docker__default_pip_packages + docker__pip_packages }}"
-  when: item.name | d()
+  when: (item.name | length > 0) | d()
 
 - name: Create python3-docker proxy script to access Virtualenv's interpreter
   ansible.builtin.template:
@@ -114,8 +114,9 @@
     state: "link"
   loop: "{{ docker__default_pip_packages + docker__pip_packages }}"
   when:
-    - item.state | d("present") != "absent"
-    - item.path | d() and item.src | d()
+    - item.state | default('present') != 'absent'
+    - item.path is defined and item.path | length > 0
+    - item.src  is defined and item.src  | length > 0
 
 - name: Add user(s) to "docker" group
   ansible.builtin.user:
@@ -196,6 +197,8 @@
     user: "{{ item.user | d('root') }}"
   loop: "{{ docker__cron_jobs }}"
   when:
-    - item.state | d("present") != "absent"
-    - item.name | d() and item.job | d()
-    - item.schedule | d() and item.cron_file | d()
+    - item.name is defined and item.name | length > 0
+    - item.job  is defined and item.job  | length > 0
+    - item.cron_file is defined and item.cron_file | length > 0
+    - item.schedule is defined
+    - item.schedule | length >= 5
